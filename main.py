@@ -44,54 +44,57 @@ def create_utility_matrix(df, item_means):
     return user_matrix, item_matrix, item_sqrd
 
 def run(ratings, targets):
-	train_df = pd.read_csv(ratings, sep='[:,]')
-	test_df = pd.read_csv(targets, sep=':')
+    train_df = pd.read_csv(ratings, sep='[:,]')
+    test_df = pd.read_csv(targets, sep=':')
 
-	abs_mean = round(train_df['Prediction'].mean(), 4)
-	
-	item_means = {c:round(v,4) for c,v in train_df.groupby('ItemId')['Prediction'].mean().items()}
+    abs_mean = round(train_df['Prediction'].mean(), 4)
+    
+    item_means = {c:round(v,4) for c,v in train_df.groupby('ItemId')['Prediction'].mean().items()}
 
-	user_matrix, item_matrix, item_sqrd = create_utility_matrix(train_df, item_means)
+    user_matrix, item_matrix, item_sqrd = create_utility_matrix(train_df, item_means)
 
-	results = []
-	pre_calc = {}
-	for row in test_df.itertuples():
-	    try:
-	        item_means[row.ItemId]
-	    except: 
-	        try:
-	            results.append(user_means[row.UserId])
-	        except:
-	            results.append(abs_mean)
-	        continue
-	        
-	    pred = 0
-	    s = 0
-	    try:
-	        for item in user_matrix[row.UserId].keys():            
-	            tup = sort(item, row.ItemId)
+    results = []
+    pre_calc = {}
+    for row in test_df.itertuples():
+        try:
+            item_means[row.ItemId]
+        except: 
+            try:
+                results.append(user_means[row.UserId])
+            except:
+                results.append(abs_mean)
+            continue
+            
+        pred = 0
+        s = 0
+        try:
+            for item in user_matrix[row.UserId].keys():            
+                tup = sort(item, row.ItemId)
 
-	            if tup not in pre_calc:
-	            	sim = pearson(item, row.ItemId, item_matrix, item_sqrd)
-	            	pre_calc[tup] = sim
-	            else:
-	            	sim = pre_calc[tup]
-	            
-	            pred += sim*user_matrix[row.UserId][item]
-	            s += abs(sim)
-	        results.append((pred/s) + item_means[row.ItemId])
-	    except:
-	        results.append(item_means[row.ItemId])
+                if tup not in pre_calc:
+                    sim = pearson(item, row.ItemId, item_matrix, item_sqrd)
+                    pre_calc[tup] = sim
+                else:
+                    sim = pre_calc[tup]
+                
+                pred += sim*user_matrix[row.UserId][item]
+                s += abs(sim)
+            if s:
+                results.append((pred/s) + item_means[row.ItemId])
+            else:
+                results.append(item_means[row.ItemId])
+        except:
+            results.append(item_means[row.ItemId])
 
-	results = [x if str(x) != 'nan' else abs_mean for x in results]
+    results = [10 if x > 10 else 0 if x < 0 else x for x in results]
 
-	sub_df = pd.read_csv(targets)
-	sub_df['Prediction'] = results
+    sub_df = pd.read_csv(targets)
+    sub_df['Prediction'] = results
 
-	print(sub_df.to_csv(index=False))
+    print(sub_df.to_csv(index=False))
 
 if __name__ == "__main__":
-	start = time.time()
-	run(sys.argv[1], sys.argv[2])
-	stop = time.time()
-	print(stop - start)
+    start = time.time()
+    run(sys.argv[1], sys.argv[2])
+    stop = time.time()
+    print(stop - start)
