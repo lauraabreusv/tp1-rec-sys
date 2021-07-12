@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import time
 
-def sort(a, b):
+def sort_tup(a, b):
     if a > b:
         return(a, b)
     return(b,a)
@@ -49,7 +49,10 @@ def run(ratings, targets):
 
     abs_mean = round(train_df['Prediction'].mean(), 4)
     
+    user_means = {c:round(v,4) for c,v in train_df.groupby('UserId')['Prediction'].mean().items()}
     item_means = {c:round(v,4) for c,v in train_df.groupby('ItemId')['Prediction'].mean().items()}
+    user_counts = {c: v for c,v in train_df.groupby('UserId')['Prediction'].count().items()}
+    item_counts = {c: v for c,v in train_df.groupby('ItemId')['Prediction'].count().items()}
 
     user_matrix, item_matrix, item_sqrd = create_utility_matrix(train_df, item_means)
 
@@ -60,7 +63,7 @@ def run(ratings, targets):
             item_means[row.ItemId]
         except: 
             try:
-                results.append(user_means[row.UserId])
+                results.append((user_means[row.UserId]*user_counts[row.UserId]+abs_mean)/(user_counts[row.UserId]+1))
             except:
                 results.append(abs_mean)
             continue
@@ -68,23 +71,30 @@ def run(ratings, targets):
         pred = 0
         s = 0
         try:
-            for item in user_matrix[row.UserId].keys():            
-                tup = sort(item, row.ItemId)
-
+            sims = []
+            preds = []
+            for item in user_matrix[row.UserId].keys(): 
+                tup = sort_tup(item, row.ItemId)
+                
                 if tup not in pre_calc:
                     sim = pearson(item, row.ItemId, item_matrix, item_sqrd)
                     pre_calc[tup] = sim
                 else:
                     sim = pre_calc[tup]
-                
-                pred += sim*user_matrix[row.UserId][item]
-                s += abs(sim)
-            if s:
+                    
+                if sim != 0:
+                    sims.append(sim)
+
+            if len(sims) > 0:
+                sims.sort()
+                s = sum(abs(x) for x in sims[:ceil(0.6*len(sims))])
+                preds = sum(x*user_matrix[row.UserId][item] for x in sims[:ceil(0.6*len(sims))])
                 results.append((pred/s) + item_means[row.ItemId])
             else:
-                results.append(item_means[row.ItemId])
+                results.append((item_means[row.ItemId]*item_counts[row.ItemId]+abs_mean)/(item_counts[row.ItemId]+1))
         except:
-            results.append(item_means[row.ItemId])
+            results.append((item_means[row.ItemId]*item_counts[row.ItemId]+abs_mean)/(item_counts[row.ItemId]+1))
+
 
     results = [10 if x > 10 else 0 if x < 0 else x for x in results]
 
