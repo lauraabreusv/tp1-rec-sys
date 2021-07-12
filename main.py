@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import time
 
-def sort_tup(a, b):
+def sort(a, b):
     if a > b:
         return(a, b)
     return(b,a)
@@ -58,6 +58,8 @@ def run(ratings, targets):
 
     results = []
     pre_calc = {}
+    count = 0
+    count_s = 0
     for row in test_df.itertuples():
         try:
             item_means[row.ItemId]
@@ -71,30 +73,25 @@ def run(ratings, targets):
         pred = 0
         s = 0
         try:
-            sims = []
-            preds = []
-            for item in user_matrix[row.UserId].keys(): 
-                tup = sort_tup(item, row.ItemId)
-                
+            for item in user_matrix[row.UserId].keys():            
+                tup = sort(item, row.ItemId)
+
                 if tup not in pre_calc:
                     sim = pearson(item, row.ItemId, item_matrix, item_sqrd)
                     pre_calc[tup] = sim
                 else:
                     sim = pre_calc[tup]
-                    
-                if sim != 0:
-                    sims.append(sim)
-
-            if len(sims) > 0:
-                sims.sort()
-                s = sum(abs(x) for x in sims[:ceil(0.6*len(sims))])
-                preds = sum(x*user_matrix[row.UserId][item] for x in sims[:ceil(0.6*len(sims))])
+                
+                pred += sim*user_matrix[row.UserId][item]
+                s += abs(sim)
+            if s:
                 results.append((pred/s) + item_means[row.ItemId])
+                count_s +=1
             else:
                 results.append((item_means[row.ItemId]*item_counts[row.ItemId]+abs_mean)/(item_counts[row.ItemId]+1))
+                count+=1
         except:
             results.append((item_means[row.ItemId]*item_counts[row.ItemId]+abs_mean)/(item_counts[row.ItemId]+1))
-
 
     results = [10 if x > 10 else 0 if x < 0 else x for x in results]
 
@@ -102,6 +99,9 @@ def run(ratings, targets):
     sub_df['Prediction'] = results
 
     print(sub_df.to_csv(index=False))
+
+    print(count)
+    print(count_s)
 
 if __name__ == "__main__":
     start = time.time()
