@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import time
 
-def sort(a, b):
+def sort_tups(a, b):
     if a > b:
         return(a, b)
     return(b,a)
@@ -60,6 +60,7 @@ def run(ratings, targets):
     pre_calc = {}
     count = 0
     count_s = 0
+    count_n = 0
     for row in test_df.itertuples():
         try:
             item_means[row.ItemId]
@@ -70,21 +71,36 @@ def run(ratings, targets):
                 results.append(abs_mean)
             continue
             
-        pred = 0
-        s = 0
+        # pred = 0
+        # s = 0
+        sims = []
         try:
             for item in user_matrix[row.UserId].keys():            
-                tup = sort(item, row.ItemId)
+                tup = sort_tups(item, row.ItemId)
 
                 if tup not in pre_calc:
                     sim = pearson(item, row.ItemId, item_matrix, item_sqrd)
                     pre_calc[tup] = sim
                 else:
                     sim = pre_calc[tup]
-                
-                pred += sim*user_matrix[row.UserId][item]
-                s += abs(sim)
-            if s:
+
+                if sim != 0:
+                    sims.append((sim, item))
+                    
+
+            #top-200
+            if len(sims) > 50:
+                sims.sort(reverse=True)
+                pred = sum(sims[i][0]*user_matrix[row.UserId][sims[i][1]] for i in range(50))
+                s = sum(abs(x[0]) for x in sims[:50])
+                results.append((pred/s) + item_means[row.ItemId])
+                count_n +=1
+                # pred += sim*user_matrix[row.UserId][item]
+                # s += abs(sim)
+            # if s:
+            elif len(sims) > 0:
+                pred = sum(sims[i][0]*user_matrix[row.UserId][sims[i][1]] for i in range(len(sims)))
+                s = sum(abs(x[0]) for x in sims)
                 results.append((pred/s) + item_means[row.ItemId])
                 count_s +=1
             else:
@@ -102,6 +118,7 @@ def run(ratings, targets):
 
     print(count)
     print(count_s)
+    print(count_n)
 
 if __name__ == "__main__":
     start = time.time()
